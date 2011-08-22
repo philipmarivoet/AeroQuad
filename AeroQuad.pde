@@ -479,14 +479,6 @@ void setup() {
     pinMode(33, INPUT); // disable SERVO 1, jumper D12 for roll
     pinMode(34, INPUT); // disable SERVO 2, jumper D11 for pitch
     pinMode(35, INPUT); // disable SERVO 3, jumper D13 for yaw
-    pinMode(43, OUTPUT); // LED 1
-    pinMode(44, OUTPUT); // LED 2
-    pinMode(45, OUTPUT); // LED 3
-    pinMode(46, OUTPUT); // LED 4
-    digitalWrite(43, HIGH); // LED 1 on
-    digitalWrite(44, HIGH); // LED 2 on
-    digitalWrite(45, HIGH); // LED 3 on
-    digitalWrite(46, HIGH); // LED 4 on  
   #endif
   #if defined(APM_OP_CHR6DM) || defined(ArduCopter) 
     pinMode(LED_Red, OUTPUT);
