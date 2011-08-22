@@ -56,10 +56,9 @@
 // Optional Sensors
 // Warning:  If you enable HeadingHold or AltitudeHold and do not have the correct sensors connected, the flight software may hang
 // *******************************************************************************************************************************
-#define HeadingMagHold // Enables HMC5843 Magnetometer, gets automatically selected if CHR6DM is defined
-#define AltitudeHold // Enables BMP085 Barometer (experimental, use at your own risk)
-#define BattMonitor //define your personal specs in BatteryMonitor.h! Full documentation with schematic there
-//#define JuicMonitor //define your personal specs in BatteryMonitor.h! Full documentation with schematic there
+//#define HeadingMagHold // Enables HMC5843 Magnetometer, gets automatically selected if CHR6DM is defined
+//#define AltitudeHold // Enables BMP085 Barometer (experimental, use at your own risk)
+//#define BattMonitor //define your personal specs in BatteryMonitor.h! Full documentation with schematic there
 //#define RateModeOnly // Use this if you only have a gyro sensor, this will disable any attitude modes.
 
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -79,8 +78,8 @@
 // Please note that the flight software currently only supports 6 channels, additional channels will be supported in the future
 // Additionally 8 receiver channels are only available when not using the Arduino Uno
 // *******************************************************************************************************************************
-//#define LASTCHANNEL 6
-#define LASTCHANNEL 8
+#define LASTCHANNEL 6
+//#define LASTCHANNEL 8
 
 // *******************************************************************************************************************************
 // Camera Stabilization
@@ -96,7 +95,7 @@
 // *******************************************************************************************************************************
 // On screen display implementation using MAX7456 chip. See OSD.h for more info and configuration.
 // *******************************************************************************************************************************
-#define MAX7456_OSD
+//#define MAX7456_OSD
 
 /****************************************************************************
  ********************* End of User Definition Section ***********************
@@ -123,6 +122,9 @@
 #include "Accel.h"
 #include "Gyro.h"
 #include "Motors.h"
+
+#include "Led.h"
+YALL yall;
 
 // Create objects defined from Configuration Section above
 #ifdef AeroQuad_v1
@@ -271,10 +273,6 @@
   #ifdef BattMonitor
     #include "BatteryMonitor.h"
     BatteryMonitor_AeroQuad batteryMonitor;
-  #endif
-  #ifdef JuicMonitor
-    #include "JuiceMonitor.h"
-    JuiceMonitor_AeroQuad juiceMonitor;
   #endif
   #ifdef CameraControl
     #include "Camera.h"
@@ -550,11 +548,6 @@ void setup() {
   #ifdef BattMonitor
     batteryMonitor.initialize();
   #endif
-
-  // Juice Monitor
-  #ifdef JuicMonitor
-    juiceMonitor.initialize();
-  #endif
   
   // Camera stabilization setup
   #ifdef CameraControl
@@ -579,6 +572,8 @@ void setup() {
      binaryPort = &Serial;
     #endif 
   #endif
+  
+  yall.initialize();
   
   // AKA use a new low pass filter called a Lag Filter uncomment only if using DCM LAG filters
   //  setupFilters(accel.accelOneG);
@@ -614,6 +609,7 @@ void loop () {
   
   // Main scheduler loop set for 100hz
   if (deltaTime >= 10000) {
+    previousTime += 10000;
 
     #ifdef DEBUG_LOOP
       testSignal ^= HIGH;
@@ -774,6 +770,8 @@ void loop () {
       #ifdef DEBUG_LOOP
         digitalWrite(8, HIGH);
       #endif
+
+      yall.run();	
       
       G_Dt = (currentTime - tenHZpreviousTime) / 1000000.0;
       tenHZpreviousTime = currentTime;
@@ -785,11 +783,9 @@ void loop () {
         #ifdef BattMonitor
           batteryMonitor.measure(armed);
         #endif
-        #ifdef JuicMonitor
-          juiceMonitor.measure(armed);
-        #endif      
         processAltitudeHold();
       }
+      
       // Listen for configuration commands and reports telemetry
       if (telemetryLoop == ON) {
         readSerialCommand(); // defined in SerialCom.pde
@@ -803,9 +799,10 @@ void loop () {
       #ifdef DEBUG_LOOP
         digitalWrite(8, LOW);
       #endif      
-	}
 
-    previousTime = currentTime;
+    }
+
+//    previousTime = currentTime;
   }
   if (frameCounter >= 100) 
       frameCounter = 0;
