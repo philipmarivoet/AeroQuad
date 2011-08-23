@@ -97,6 +97,12 @@
 // *******************************************************************************************************************************
 //#define MAX7456_OSD
 
+// *******************************************************************************************************************************
+// LedMachine
+// *******************************************************************************************************************************
+#define LED_MACHINE
+
+
 /****************************************************************************
  ********************* End of User Definition Section ***********************
  ****************************************************************************/
@@ -122,9 +128,6 @@
 #include "Accel.h"
 #include "Gyro.h"
 #include "Motors.h"
-
-#include "Led.h"
-LedMachine led_machine;
 
 // Create objects defined from Configuration Section above
 #ifdef AeroQuad_v1
@@ -281,6 +284,11 @@ LedMachine led_machine;
   #ifdef MAX7456_OSD
     #include "OSD.h"
     OSD osd;
+  #endif
+
+  #ifdef LED_MACHINE
+    #include "Led.h"
+    LedMachine led_machine;
   #endif
 #endif
 
@@ -446,6 +454,38 @@ LedMachine led_machine;
 // ************************************************************
 // ********************** Setup AeroQuad **********************
 // ************************************************************
+
+#ifdef LED_MACHINE
+
+// define your LED patterns here
+
+byte led_pattern_1[] = {
+  B00010010,
+  B00000000,
+};
+
+byte led_pattern_2[] = {
+  B00000001,
+  B00000100,
+  B00100000,
+  B00001000,
+};
+
+byte led_pattern_3[] = {
+  B01000000,
+  B01000000,
+  B01000000,
+  B00000000,
+  B01000000,
+  B00000000,
+  B01000000,
+  B00000000,
+  B00000000,
+  B00000000
+};
+
+#endif
+
 void setup() {
   SERIAL_BEGIN(BAUD);
   pinMode(LEDPIN, OUTPUT);
@@ -565,8 +605,15 @@ void setup() {
     #endif 
   #endif
   
-  // Led led machine
-  led_machine.initialize();
+  #ifdef LED_MACHINE
+    // set up led machine
+    led_machine.initialize(43, 7);
+    
+    // add patterns
+    led_machine.set_pattern(0, 500, 2, led_pattern_1);
+    led_machine.set_pattern(1, 100, 4, led_pattern_2);
+    led_machine.set_pattern(2, 300, 10, led_pattern_3);
+  #endif
   
   // AKA use a new low pass filter called a Lag Filter uncomment only if using DCM LAG filters
   //  setupFilters(accel.accelOneG);
@@ -751,13 +798,11 @@ void loop () {
       G_Dt = (currentTime - twentyFiveHZpreviousTime) / 1000000.0;
       twentyFiveHZpreviousTime = currentTime;
 
-      // run the LED led machine
-      if (receiver.getData(5) > 1100) {
-        led_machine.enable_pattern(1);
-      } else {
-        led_machine.disable_pattern(1);
-      }
-      led_machine.run();	
+      #ifdef LED_MACHINE
+        // run the LED led machine
+        led_machine.enable_pattern(1, (receiver.getData(5) > 1100));
+        led_machine.run();	
+      #endif
       
       #ifdef DEBUG_LOOP
         digitalWrite(9, LOW);
