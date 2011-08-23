@@ -19,39 +19,43 @@
  */
 
 // ***********************************************************************
-// ******************** Yet Another Led Library **************************
+// ************************ PatternMachine *******************************
 // ***********************************************************************
 
-// period | mask | size | 1 ... n
-
-byte led_schedule_1[] = {
-  B00000001,
-  B00000010,
-  B00000100,
-  B00001000
-};
-
-byte led_schedule_2[] = {
-  B00100000,
-  B00110000,
-  B00010000,
+byte led_pattern_1[] = {
+  B00010010,
   B00000000,
 };
 
-byte led_schedule_3[] = {
+byte led_pattern_2[] = {
   B00000001,
+  B00000100,
+  B00100000,
+  B00001000,
+};
+
+byte led_pattern_3[] = {
+  B01000000,
+  B01000000,
+  B01000000,
+  B00000000,
+  B01000000,
+  B00000000,
+  B01000000,
+  B00000000,
+  B00000000,
   B00000000
 };
 
-#define SCHEDULE_STATE_VALID    (1 << 0)
-#define SCHEDULE_STATE_ACTIVE   (1 << 1)
-#define SCHEDULE_STATE_RUNNING  (1 << 2)
+#define PATTERN_STATE_VALID    (1 << 0)
+#define PATTERN_STATE_ACTIVE   (1 << 1)
+#define PATTERN_STATE_RUNNING  (1 << 2)
 
-typedef struct  LedSchedule {
+typedef struct  LedPattern {
   // creation info
   int step_period_;
   int step_max_;
-  byte* schedule_;
+  byte* pattern_;
 
   // run-time state
   boolean state_;
@@ -59,31 +63,28 @@ typedef struct  LedSchedule {
   int step_current_;
 };
 
-#define SCHEDULE_MAX  4
+#define PATTERN_MAX  4
 
-class YALL {
+class LedMachine {
 
 public: 
-  struct LedSchedule schedule_[SCHEDULE_MAX];
+  struct LedPattern pattern_[PATTERN_MAX];
 
   int pin_base_;
   int pin_count_;
   byte current_mask_;
 
-  YALL(void) { 
+  LedMachine(void) { 
   }
 
-  // **********************************************************************
-  // The following function calls must be defined inside any new subclasses
-  // **********************************************************************
   void initialize() {
     pin_base_ = 43;
     pin_count_ = 7;
     current_mask_ = 0xFF;
 
-    // all schedules off
-    for (int index = 0; index < SCHEDULE_MAX; index++) {
-      schedule_[index].state_ = 0;
+    // all patterns off
+    for (int index = 0; index < PATTERN_MAX; index++) {
+      pattern_[index].state_ = 0;
     }
 
     // setup pins
@@ -91,33 +92,58 @@ public:
       pinMode(pin_base_ + index, OUTPUT); // LED output
     }
 
-    // add schedules
-    set_schedule(0, 100, 4, led_schedule_1);
-    set_schedule(1, 1000, 4, led_schedule_2);
-//    set_schedule(0, 1000, 2, led_schedule_3);
+    // add patterns
+    set_pattern(0, 500, 2, led_pattern_1);
+    set_pattern(1, 100, 4, led_pattern_2);
+    set_pattern(2, 300, 10, led_pattern_3);
 
     // all off
     update(0x00);
   }
 
-  void set_schedule(int index, int step_period, int step_max, byte* schedule_bytes) {
-    LedSchedule* schedule = &schedule_[index];
+  void set_pattern(int index, int step_period, int step_max, byte* pattern_bytes) {
+    LedPattern* pattern = &pattern_[index];
     
-    schedule->step_period_ = step_period;
-    schedule->step_max_ = step_max - 1;
-    schedule->schedule_ = schedule_bytes;
-    schedule->state_ = SCHEDULE_STATE_VALID | SCHEDULE_STATE_ACTIVE;
+    pattern->step_period_ = step_period;
+    pattern->step_max_ = step_max - 1;
+    pattern->pattern_ = pattern_bytes;
+    pattern->state_ = PATTERN_STATE_VALID | PATTERN_STATE_ACTIVE;
+  }
+
+  void enable_pattern(int index) {
+    if (index < PATTERN_MAX) {
+      LedPattern* pattern = &pattern_[index];
+      
+      if ((pattern->state_ & PATTERN_STATE_VALID) && (0 == (pattern->state_ & PATTERN_STATE_ACTIVE))) {
+        // restart
+        pattern->state_ = PATTERN_STATE_VALID | PATTERN_STATE_ACTIVE;
+      }
+    }
+  }
+  
+  void disable_pattern(int index) {
+    if (index < PATTERN_MAX) {
+      LedPattern* pattern = &pattern_[index];
+      pattern->state_ &= ~PATTERN_STATE_ACTIVE;
+    }
   }
 
   void update(byte mask) {
+    byte update_mask = current_mask_ ^ mask;
+    
     for (int index = 0; index < pin_count_; index++) {
-      if (mask & (1 << index)) {
-        digitalWrite(pin_base_ + index, 1);
-      } 
-      else {
-        digitalWrite(pin_base_ + index, 0);
+      byte bit_mask = 1 << index;
+      if (0 != (update_mask & bit_mask)) {
+        if (mask & bit_mask) {
+          digitalWrite(pin_base_ + index, 1);
+        } 
+        else {
+          digitalWrite(pin_base_ + index, 0);
+        }
       }
     }
+    
+    current_mask_ = mask;
   } 
 
   void run(void) {
@@ -126,29 +152,29 @@ public:
     unsigned long now = millis();
 
     mask = 0;
-    for (int index = 0; index < SCHEDULE_MAX; index++) {
-      LedSchedule* schedule = &schedule_[index];
+    for (int index = 0; index < PATTERN_MAX; index++) {
+      LedPattern* pattern = &pattern_[index];
 
-      if (0 == (schedule->state_ & SCHEDULE_STATE_ACTIVE)) {
-        // next please
+      if (0 == (pattern->state_ & PATTERN_STATE_ACTIVE)) {
+        // skip
         continue;
       }
 
-      if (0 == (schedule->state_ & SCHEDULE_STATE_RUNNING)) {
+      if (0 == (pattern->state_ & PATTERN_STATE_RUNNING)) {
         // first time
-        schedule->step_current_ = 0;
-        schedule->timeout_ = now + schedule->step_period_;
-        schedule->state_ |= SCHEDULE_STATE_RUNNING;
+        pattern->step_current_ = 0;
+        pattern->timeout_ = now + pattern->step_period_;
+        pattern->state_ |= PATTERN_STATE_RUNNING;
       } 
-      else if (schedule->timeout_ <= now) {
-        schedule->step_current_++;
-        if (schedule->step_current_ > schedule->step_max_) {
-          schedule->step_current_ = 0;
+      else if (pattern->timeout_ <= now) {
+        pattern->step_current_++;
+        if (pattern->step_current_ > pattern->step_max_) {
+          pattern->step_current_ = 0;
         }
-        schedule->timeout_ = now + schedule->step_period_;
+        pattern->timeout_ = now + pattern->step_period_;
       }
 
-      mask |= schedule->schedule_[schedule->step_current_];
+      mask |= pattern->pattern_[pattern->step_current_];
 
     }
 

@@ -124,7 +124,7 @@
 #include "Motors.h"
 
 #include "Led.h"
-YALL yall;
+LedMachine led_machine;
 
 // Create objects defined from Configuration Section above
 #ifdef AeroQuad_v1
@@ -565,7 +565,8 @@ void setup() {
     #endif 
   #endif
   
-  yall.initialize();
+  // Led led machine
+  led_machine.initialize();
   
   // AKA use a new low pass filter called a Lag Filter uncomment only if using DCM LAG filters
   //  setupFilters(accel.accelOneG);
@@ -749,6 +750,14 @@ void loop () {
       
       G_Dt = (currentTime - twentyFiveHZpreviousTime) / 1000000.0;
       twentyFiveHZpreviousTime = currentTime;
+
+      // run the LED led machine
+      if (receiver.getData(5) > 1100) {
+        led_machine.enable_pattern(1);
+      } else {
+        led_machine.disable_pattern(1);
+      }
+      led_machine.run();	
       
       #ifdef DEBUG_LOOP
         digitalWrite(9, LOW);
@@ -763,8 +772,6 @@ void loop () {
         digitalWrite(8, HIGH);
       #endif
 
-      yall.run();	
-      
       G_Dt = (currentTime - tenHZpreviousTime) / 1000000.0;
       tenHZpreviousTime = currentTime;
 
